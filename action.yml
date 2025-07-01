@@ -311,9 +311,11 @@ runs:
                 fi
             elif [ -f nongki.txt ]; then
                 if grep -q "CONFIG_KPROBES=y" "arch/${{ inputs.arch }}/configs/${{ inputs.config }}" ; then
-                    echo "CONFIG_KPROBES is enabled, skip patch."
+                    echo "恭喜你，成功打上了补丁"
+                    sleep 3
                 else
-                    curl -SsL https://github.com/dabao1955/kernel_build_action/raw/main/kernelsu/apply_cocci.sh | bash
+                    echo "记得打补丁，否则编译失效，打补丁方法看哔哩哔哩的：花五分钟为您的设备编译ksu"
+                    sleep 3
                 fi
             fi
             echo "::endgroup::"
