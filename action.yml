@@ -323,12 +323,15 @@ runs:
          echo "add susfs"
          sleep 2
          git clone https://gitlab.com/simonpunk/susfs4ksu.git -b kernel-4.14
+         echo "log："
+         ls
+         sleep 5
          echo "Replication, configuration, application, patch, susfs module @线石阿柒"
          sleep 0.2
-         cp ./kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./KernelSU/
-         cp ./kernel_patches/50_add_susfs_in_kernel-4.14.patch ./
-         cp ./kernel_patches/fs/susfs.c ./fs/
-         cp ./kernel_patches/include/linux/susfs.h ./include/linux/
+         cp ./susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./KernelSU/
+         cp ./susfs4ksu/kernel_patches/50_add_susfs_in_kernel-4.14.patch ./
+         cp ./susfs4ksu/kernel_patches/fs/susfs.c ./fs/
+         cp ./susfs4ksu/kernel_patches/include/linux/susfs.h ./include/linux/
          patch -p1 < ./KernelSU/10_enable_susfs_for_ksu.patch
          patch -p1 < 50_add_susfs_in_kernel-4.14.patch
          if [ ${{ inputs.rekernel }} = true ]; then
