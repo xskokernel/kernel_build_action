@@ -300,6 +300,9 @@ runs:
                         echo "版本(最新):OK"
                     fi
                     curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s susfs-main
+                    git clone https://gitlab.com/simonpunk/susfs4ksu.git
+                    cd susfs4ksu
+                    bash build_ksu_susfs_tool.sh
                 fi
             fi
             if [ ${{ inputs.ksu-lkm }} = true ]; then
