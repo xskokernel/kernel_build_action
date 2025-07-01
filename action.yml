@@ -326,7 +326,6 @@ runs:
          git clone https://github.com/SukiSU-Ultra/SukiSU_patch.git
          echo "log："
          ls
-         sleep 5
          echo "Replication, configuration, application, patch, susfs module @线石阿柒"
            cp ./susfs4ksu/kernel_patches/50_add_susfs_in_kernel-4.14.patch ./
            cp ./susfs4ksu/kernel_patches/fs/* ./fs/
@@ -339,13 +338,11 @@ runs:
            # Apply patches
            sed -i 's/-32,12 +32,38/-32,11 +32,37/g' 50_add_susfs_in_kernel-4.14.patch
            sed -i '/#include <trace\/hooks\/fs.h>/d' 50_add_susfs_in_kernel-4.14.patch
-
-           patch -p1 < 50_add_susfs_in_kernel-4.14.patch || true
+           patch -p1 --fuzz=5 < 50_add_susfs_in_kernel-4.14.patch || true
            cp ./SukiSU_patch/hooks/syscall_hooks.patch ./
            patch -p1 -F 3 < syscall_hooks.patch
            echo "完成"
            sleep 2
-         sleep 0.2
          if [ ${{ inputs.rekernel }} = true ]; then
              echo "::group:: Initalizing Re-Kernel"
              curl -SsL https://github.com/dabao1955/kernel_build_action/raw/main/rekernel/patch.sh | bash
