@@ -300,9 +300,6 @@ runs:
                         echo "版本(最新):OK"
                     fi
                     curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s susfs-main
-                    git clone https://gitlab.com/simonpunk/susfs4ksu.git
-                    cd susfs4ksu
-                    bash build_ksu_susfs_tool.sh
                 fi
             fi
             if [ ${{ inputs.ksu-lkm }} = true ]; then
@@ -323,7 +320,17 @@ runs:
             fi
             echo "::endgroup::"
          fi
-
+         echo "add susfs"
+         sleep 2
+         git clone https://gitlab.com/simonpunk/susfs4ksu.git -b kernel-4.14
+         echo "Replication, configuration, application, patch, susfs module @线石阿柒"
+         sleep 0.2
+         cp ./kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./KernelSU/
+         cp ./kernel_patches/50_add_susfs_in_kernel-4.14.patch ./
+         cp ./kernel_patches/fs/susfs.c ./fs/
+         cp ./kernel_patches/include/linux/susfs.h ./include/linux/
+         patch -p1 < ./KernelSU/10_enable_susfs_for_ksu.patch
+         patch -p1 < 50_add_susfs_in_kernel-4.14.patch
          if [ ${{ inputs.rekernel }} = true ]; then
              echo "::group:: Initalizing Re-Kernel"
              curl -SsL https://github.com/dabao1955/kernel_build_action/raw/main/rekernel/patch.sh | bash
