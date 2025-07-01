@@ -299,7 +299,7 @@ runs:
                     else
                         echo "版本(最新):OK"
                     fi
-                    curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s nongki
+                    curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s susfs-main
                 fi
             fi
             if [ ${{ inputs.ksu-lkm }} = true ]; then
