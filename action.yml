@@ -328,10 +328,6 @@ runs:
              curl -SsL https://github.com/dabao1955/kernel_build_action/raw/main/rekernel/patch.sh | bash
              echo "::endgroup::"
          fi
-         echo "尝试拦截KSUNEXT"
-         sleep 3
-         rm -rf ./KernelSU-Next
-         curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s susfs-main
          if [ -f scripts/dtc/libfdt/mkdtboimg.py ]; then
             if grep python2 scripts/Makefile.lib >/dev/null; then
                 echo "::group:: Using mkdtboimg Python3 version instead of Python2 version"
