@@ -6,10 +6,10 @@ branding:
   color: 'blue'
 
 inputs:
-  kernel-url:
+  kernel-url: 'https://github.com/sigbin35/android_device_kernel_sm8250_c2q.git'
     description: 'Kernel Source Url'
     required: true
-  depth:
+  depth: 1
     required: false
     default: 1
   vendor:
@@ -33,14 +33,14 @@ inputs:
   config:
     description: 'configuration for building android kernel'
     required: true
-    default: defconfig
+    default: c2q_kor_singlew_defconfig
   arch:
     required: true
     default: arm64
   android-version:
     description: 'Android version.'
     required: false
-    default: ""
+    default: "13"
   ksu:
     description: 'KernelSU function support'
     required: false
