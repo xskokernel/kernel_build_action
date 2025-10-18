@@ -491,6 +491,7 @@ run: |
           fi
           
         - name: 构建内核
+        run: |
          echo "::group:: Building Kernel with selected cross compiler"
          EXTRA_CMD="${{ inputs.extra-cmd }}"
          if [[ -n "$EXTRA_CMD" && ! "$EXTRA_CMD" =~ ^[a-zA-Z0-9_=+./,\ -]*$ ]]; then
