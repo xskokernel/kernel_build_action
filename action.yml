@@ -132,6 +132,7 @@ runs:
         #!/bin/bash
         rm -rf kernel_workspace
         mkdir kernel_workspace
+        cd kernel_workspace
         set -euo pipefail
 
         # Function to display error messages and exit
@@ -274,15 +275,7 @@ runs:
         echo "::endgroup::"
 
         # Clone the vendor kernel source if specified
-        if [ "${{ inputs.vendor }}" == "true" ]; then
-            echo "::group::Pulling Kernel Vendor Source"
-            git clone -b "${{ inputs.vendor-branch }}" --depth="${{ inputs.depth }}" "${{ inputs.vendor-url }}" "kernel/${{ inputs.vendor-dir }}"
-            if [ -d "kernel/${{ inputs.vendor-dir }}/vendor" ]; then
-                cp -rv "kernel/${{ inputs.vendor-dir }}/vendor" kernel
-                cp -rv "kernel/${{ inputs.vendor-dir }}/vendor" ./
-            fi
-            echo "::endgroup::"
-        fi
+        git clone https://github.com/xskokernel/K34pure.git
         mv K34pure common 
 
         # Set up GCC-related variables
