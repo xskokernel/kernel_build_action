@@ -346,12 +346,7 @@ runs:
     - name: 集成sukisu与susfs
       shell: bash
       run: |
-            if [ ! -d "common" ]; then
-            cd kernel_workspace || { echo "进入 kernel_workspace 失败！目录不存在"; exit 1; }
-            echo "已进入 kernel_workspace 目录"
-            else
-            echo "common 文件夹已存在，跳过操作"
-            fi
+            cd kernel_workspace
         curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU-Ultra/refs/heads/main/kernel/setup.sh" | bash -s susfs-main
             cd ./KernelSU
             # 获取当前 Git 提交的短哈希 (8位)
