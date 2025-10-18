@@ -344,6 +344,7 @@ runs:
     - name: 集成sukisu与susfs
       shell: bash
       run: |
+        cd common
         curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU-Ultra/refs/heads/main/kernel/setup.sh" | bash -s susfs-main
             cd ./KernelSU
             # 获取当前 Git 提交的短哈希 (8位)
@@ -398,6 +399,7 @@ runs:
             grep -A10 "REPO_OWNER" kernel/Makefile  # 检查插入点后的内容
             grep "KSU_VERSION_FULL" kernel/Makefile # 确认版本定义存在
             echo "SukiSU版本号: v${KSU_API_VERSION}-${GIT_COMMIT_HASH}@xsaq"    
+            cd ..
             echo "正在添加SukiSU Ultra补丁..."
             git clone https://github.com/ShirkNeko/susfs4ksu.git -b kernel-4.14
             git clone https://github.com/ShirkNeko/SukiSU_patch.git
