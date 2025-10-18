@@ -488,10 +488,10 @@ run: |
             sed -i 's/selinuxfs.o //g' "./selinux/Makefile"
             sed -i 's/hooks.o //g' "./selinux/Makefile"
             cat "./baseband-guard/sepatch.txt" >> "./selinux/Makefile"
-          fi
           
         - name: 构建内核
-        run: |
+         shell: bash
+         run: |
          echo "::group:: Building Kernel with selected cross compiler"
          EXTRA_CMD="${{ inputs.extra-cmd }}"
          if [[ -n "$EXTRA_CMD" && ! "$EXTRA_CMD" =~ ^[a-zA-Z0-9_=+./,\ -]*$ ]]; then
