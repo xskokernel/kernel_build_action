@@ -346,7 +346,7 @@ runs:
     - name: 集成sukisu与susfs
       shell: bash
       run: |
-            cd kernel_workspace
+      cd kernel_workspace
         curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU-Ultra/refs/heads/main/kernel/setup.sh" | bash -s susfs-main
             cd ./KernelSU
             # 获取当前 Git 提交的短哈希 (8位)
