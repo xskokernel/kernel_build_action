@@ -126,10 +126,12 @@ runs:
         max-size: 4G
         create-symlink: true
 
-    - name: Build Kernel
+    - name: 准备流程
       shell: bash
       run: |
         #!/bin/bash
+        rm -rf kernel_workspace
+        mkdir kernel_workspace
         set -euo pipefail
 
         # Function to display error messages and exit
@@ -281,8 +283,7 @@ runs:
             fi
             echo "::endgroup::"
         fi
-
-        cd "kernel/${{ inputs.kernel-dir }}"
+        mv K34pure common 
 
         # Set up GCC-related variables
         if [ -d "$HOME/gcc-64/bin" ] || [ -d "$HOME/gcc-32/bin" ]; then
@@ -328,72 +329,6 @@ runs:
             NONGKI=true
         fi
 
-        # Initialize KernelSU if enabled
-        if [ "${{ inputs.ksu }}" == "true" ]; then
-            echo "::group::Initializing KernelSU"
-            if [ -f KernelSU/kernel/Kconfig ]; then
-                echo "KernelSU has been initialized, skipping."
-            else
-                # Download the KernelSU setup script
-                if [ "${{ inputs.ksu-other }}" == "true" ]; then
-                    if [ -z "${{ inputs.ksu-url }}" ]; then
-                        error "ksu-url is required when ksu-other is true"
-                    fi
-                    curl -sSLf "${{ inputs.ksu-url }}/raw/${{ inputs.ksu-version }}/kernel/setup.sh" -o ksu_setup.sh || error "Failed to download KernelSU setup script"
-                else
-                    curl -sSLf "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" -o ksu_setup.sh || error "Failed to download KernelSU setup script"
-                fi
-
-                # Determine the KernelSU version to use
-                echo "Kernel version: $VERSION.$PATCHLEVEL.$SUBLEVEL"
-                KVER="${{ inputs.ksu-version }}"
-                if [ "$NONGKI" == "true" ]; then
-                    echo "Warning: The KernelSU version you selected was detected to be ${{ inputs.ksu-version }}, but KernelSU has dropped support for the non-gki kernel since 0.9.5."
-                    echo "This will force switch to v0.9.5."
-                    KVER=v0.9.5
-                fi
-
-                # Execute the KernelSU setup script
-                bash ksu_setup.sh "$KVER" || error "Failed to execute KernelSU setup script"
-            fi
-
-            # Configure KernelSU
-            CONFIG_FILE="arch/${{ inputs.arch }}/configs/${{ inputs.config }}"
-            if [ "${{ inputs.ksu-lkm }}" == "true" ]; then
-                # Build KernelSU as a loadable kernel module
-                if grep -q "CONFIG_KPROBES=y" "$CONFIG_FILE"; then
-                    sed -i 's/CONFIG_KSU=y/CONFIG_KSU=m/g' "$CONFIG_FILE"
-                else
-                    sed -i '/config KSU/,/help/{s/default y/default m/}' drivers/kernelsu/Kconfig
-                fi
-            elif [ "$NONGKI" == "true" ]; then
-                # Apply patches for non-GKI kernels
-                if grep -q "CONFIG_KPROBES=y" "$CONFIG_FILE" 2>/dev/null; then
-                    echo "CONFIG_KPROBES is enabled, skip patch."
-                else
-                    if curl -sSLf "${{ github.action_path }}/kernelsu/apply_cocci.sh" -o /tmp/apply_cocci.sh; then
-                        bash /tmp/apply_cocci.sh || echo "Warning: Failed to apply KernelSU patches"
-                        rm -f /tmp/apply_cocci.sh
-                    else
-                        echo "Warning: Failed to download apply_cocci.sh"
-                    fi
-                fi
-            fi
-            echo "::endgroup::"
-        fi
-
-        # Initialize Re-Kernel if enabled
-        if [ "${{ inputs.rekernel }}" == "true" ]; then
-            echo "::group::Initializing Re-Kernel"
-            if curl -sSLf "${{ github.action_path }}/rekernel/patch.sh" -o /tmp/rekernel_patch.sh; then
-                bash /tmp/rekernel_patch.sh || error "Failed to apply Re-Kernel patches"
-                rm -f /tmp/rekernel_patch.sh
-            else
-                error "Failed to download Re-Kernel patch script"
-            fi
-            echo "::endgroup::"
-        fi
-
         # Use Python3 version of mkdtboimg.py
         if [ -f scripts/dtc/libfdt/mkdtboimg.py ]; then
             if grep -q python2 scripts/Makefile.lib 2>/dev/null; then
@@ -429,37 +364,133 @@ runs:
             fi
             echo "::endgroup::"
         fi
+- name: 集成sukisu与susfs
+shell: bash
+run: |
+        curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU-Ultra/refs/heads/main/kernel/setup.sh" | bash -s susfs-main
+            cd ./KernelSU
+            # 获取当前 Git 提交的短哈希 (8位)
+            GIT_COMMIT_HASH=$(git rev-parse --short=8 HEAD)
+            echo "当前提交哈希: $GIT_COMMIT_HASH"
+            export KSU_VERSION=$KSU_VERSION
+            # 尝试最多 3 次获取 KernelSU API 版本号
+            for i in {1..3}; do
+              # 从远程 Makefile 中提取 KSU_API_VERSION
+              KSU_API_VERSION=$(curl -s "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/susfs-main/kernel/Makefile" | 
+                # 查找第一个包含版本定义的行
+                grep -m1 "KSU_VERSION_API :=" | 
+                # 提取等号后的值
+                awk -F'= ' '{print $2}' | 
+                # 删除所有空白字符
+                tr -d '[:space:]')
+              # 如果成功获取到版本号则跳出循环，否则等待 1 秒后重试
+              [ -n "$KSU_API_VERSION" ] && break || sleep 1
+            done
+            # 如果获取失败，使用默认版本号 3.1.7
+            [ -z "$KSU_API_VERSION" ] && KSU_API_VERSION="3.1.7"
+            # 将 API 版本号存储到 GitHub 环境变量
+            echo "KSU_API_VERSION=$KSU_API_VERSION" >> $GITHUB_ENV
+            # 创建版本定义模板&版本格式函数: 使用获取的提交哈希和固定后缀
+            # KSU_VERSION_API: API 版本定义
+            # KSU_VERSION_FULL: 完整版本定义
+            VERSION_DEFINITIONS=$'define get_ksu_version_full\nv\\$1-'"$GIT_COMMIT_HASH"$'@xsaq\nendef\n\nKSU_VERSION_API := '"$KSU_API_VERSION"$'\nKSU_VERSION_FULL := v'"$KSU_API_VERSION"$'-'"$GIT_COMMIT_HASH"$'@xsaq'
+            # 清理内核 Makefile 中的旧版本定义
+            # 删除版本函数
+            sed -i '/define get_ksu_version_full/,/endef/d' kernel/Makefile
+            # 删除 API 版本定义
+            sed -i '/KSU_VERSION_API :=/d' kernel/Makefile
+            # 删除完整版本定义
+            sed -i '/KSU_VERSION_FULL :=/d' kernel/Makefile
+            # 在 REPO_OWNER 行后插入新版本定义
+            awk -v def="$VERSION_DEFINITIONS" '
+              # 当找到 REPO_OWNER 行时，插入版本定义并设置标记
+              /REPO_OWNER :=/ {print; print def; inserted=1; next}
+              # 打印所有行
+              1
+              # 如果未找到插入点，在文件末尾追加
+              END {if (!inserted) print def}
+            ' kernel/Makefile > kernel/Makefile.tmp && mv kernel/Makefile.tmp kernel/Makefile
 
-        # Disable LTO if specified
-        if [ "${{ inputs.disable-lto }}" == "true" ]; then
-            if grep -q "LTO" "arch/${{ inputs.arch }}/configs/${{ inputs.config }}"; then
-                sed -i 's/CONFIG_LTO=y/CONFIG_LTO=n/' "arch/${{ inputs.arch }}/configs/${{ inputs.config }}"
-                sed -i 's/CONFIG_LTO_CLANG=y/CONFIG_LTO_CLANG=n/' "arch/${{ inputs.arch }}/configs/${{ inputs.config }}"
-                sed -i 's/CONFIG_THINLTO=y/CONFIG_THINLTO=n/' "arch/${{ inputs.arch }}/configs/${{ inputs.config }}"
-                echo "CONFIG_LTO_NONE=y" >> "arch/${{ inputs.arch }}/configs/${{ inputs.config }}"
-            fi
-        fi
+            # 生成自定义版本号（基于提交计数）, 失败时使用 114514
+            KSU_VERSION=$(expr $(git rev-list --count main) + 10700 2>/dev/null || echo 114514)
+            # 存储版本号到 GitHub 环境变量
+            echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
+            echo "ksuver=$KSU_VERSION" >> $GITHUB_OUTPUT
 
-        # Enable KVM if specified
-        if [ "${{ inputs.kvm }}" == "true" ]; then
-            echo "CONFIG_VIRTUALIZATION=y" >> "arch/${{ inputs.arch }}/configs/${{ inputs.config }}"
-            echo "CONFIG_KVM=y" >> "arch/${{ inputs.arch }}/configs/${{ inputs.config }}"
-            echo "CONFIG_KVM_MMIO=y" >> "arch/${{ inputs.arch }}/configs/${{ inputs.config }}"
-            echo "CONFIG_KVM_ARM_HOST=y" >> "arch/${{ inputs.arch }}/configs/${{ inputs.config }}"
-        fi
-
-        # Enable LXC if specified
-        if [ "${{ inputs.lxc }}" == "true" ]; then
-            echo "::group::Enabling LXC"
-            cp -v "${{ github.action_path }}/lxc/config.sh" config.sh
-            bash config.sh "arch/${{ inputs.arch }}/configs/${{ inputs.config }}" -w
-            if [ "${{ inputs.lxc-patch }}" == "true" ]; then
-                curl -sSL "${{ github.action_path }}/lxc/patch.sh" | bash
-            fi
-            echo "::endgroup::"
-        fi
-
-        # Build the kernel
+            # 验证修改结果
+            grep -A10 "REPO_OWNER" kernel/Makefile  # 检查插入点后的内容
+            grep "KSU_VERSION_FULL" kernel/Makefile # 确认版本定义存在
+            echo "SukiSU版本号: v${KSU_API_VERSION}-${GIT_COMMIT_HASH}@xsaq"    
+            echo "正在添加SukiSU Ultra补丁..."
+            git clone https://github.com/ShirkNeko/susfs4ksu.git -b kernel-4.14
+            git clone https://github.com/ShirkNeko/SukiSU_patch.git
+            cp ./susfs4ksu/kernel_patches/50_add_susfs_in_kernel-4.14.patch ./common/
+            cp ./susfs4ksu/kernel_patches/fs/* ./common/fs/
+            cp ./susfs4ksu/kernel_patches/include/linux/* ./common/include/linux/
+            cp ./SukiSU_patch/hooks/scope_min_manual_hooks_v1.5.patch ./common/
+            cp ./SukiSU_patch/69_hide_stuff.patch ./common/
+            cd ./common
+            patch -p1 50_add_susfs_in_kernel-4.14.patch || true
+            sleep 2
+            patch -p1 < scope_min_manual_hooks_v1.5.patch || true
+            sleep 2
+            patch -p1 < 69_hide_stuff.patch || true
+            sleep 2
+            echo "CONFIG_KSU=y" >> ./common/arch/arm64/configs/phoenix_defconfig
+            echo "CONFIG_KPM=y" >> ./common/arch/arm64/configs/phoenix_defconfig
+            echo "正在开启manual/syscall钩子..."
+            echo "CONFIG_KSU_MANUAL_HOOK=y" >> ./common/arch/arm64/configs/phoenix_defconfig
+            echo "CONFIG_KSU_SUSFS_SUS_SU=n" >> ./common/arch/arm64/configs/phoenix_defconfig
+            echo "CONFIG_KSU_SUSFS=y" >> ./common/arch/arm64/configs/phoenix_defconfig
+          echo "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y" >> ./common/arch/arm64/configs/phoenix_defconfig
+          echo "CONFIG_KSU_SUSFS_SUS_PATH=y" >> ./common/arch/arm64/configs/phoenix_defconfig
+          echo "CONFIG_KSU_SUSFS_SUS_MOUNT=y" >> ./common/arch/arm64/configs/phoenix_defconfig
+          echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y" >> ./common/arch/arm64/configs/phoenix_defconfig
+          echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y" >> ./common/arch/arm64/configs/phoenix_defconfig
+          echo "CONFIG_KSU_SUSFS_SUS_KSTAT=y" >> ./common/arch/arm64/configs/phoenix_defconfig
+          echo "CONFIG_KSU_SUSFS_TRY_UMOUNT=y" >> ./common/arch/arm64/configs/phoenix_defconfig
+          echo "CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y" >> ./common/arch/arm64/configs/phoenix_defconfig
+          echo "CONFIG_KSU_SUSFS_SPOOF_UNAME=y" >> ./common/arch/arm64/configs/phoenix_defconfig
+          echo "CONFIG_KSU_SUSFS_ENABLE_LOG=y" >> ./common/arch/arm64/configs/phoenix_defconfig
+          echo "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y" >> ./common/arch/arm64/configs/phoenix_defconfig
+          echo "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y" >> ./common/arch/arm64/configs/phoenix_defconfig
+          echo "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y" >> ./common/arch/arm64/configs/phoenix_defconfig
+          #添加对 Mountify (backslashxx/mountify) 模块的支持
+          echo "CONFIG_TMPFS_XATTR=y" >> ./common/arch/arm64/configs/phoenix_defconfig
+          echo "CONFIG_TMPFS_POSIX_ACL=y" >> ./common/arch/arm64/configs/phoenix_defconfig
+          echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" >> ./common/arch/arm64/configs/phoenix_defconfig
+          sed -i 's/check_defconfig//' ./common/build.config.aarch64
+          echo "正在启用启用内核级基带保护支持…"
+            cd kernel_workspace
+            echo "CONFIG_BBG=y" >> ./common/arch/arm64/configs/phoenix_defconfig
+            cd ./common/security
+            wget https://github.com/cctv18/Baseband-guard/archive/refs/heads/master.zip
+            unzip -q master.zip
+            mv "Baseband-guard-master" baseband-guard
+            printf '\nobj-$(CONFIG_BBG) += baseband-guard/\n' >> ./Makefile
+            sed -i '/^config LSM$/,/^help$/{ /^[[:space:]]*default/ { /baseband_guard/! s/lockdown/lockdown,baseband_guard/ } }' ./Kconfig
+            awk '
+            /endmenu/ { last_endmenu_line = NR }
+            { lines[NR] = $0 }
+            END {
+              for (i=1; i<=NR; i++) {
+                if (i == last_endmenu_line) {
+                  sub(/endmenu/, "", lines[i]);
+                  print lines[i] "source \"security/baseband-guard/Kconfig\""
+                  print ""
+                  print "endmenu"
+                } else {
+                    print lines[i]
+                }
+              }
+            }
+            ' ./Kconfig > Kconfig.tmp && mv Kconfig.tmp ./Kconfig
+            sed -i 's/selinuxfs.o //g' "./selinux/Makefile"
+            sed -i 's/hooks.o //g' "./selinux/Makefile"
+            cat "./baseband-guard/sepatch.txt" >> "./selinux/Makefile"
+          fi
+          
+        - name: 构建内核
          echo "::group:: Building Kernel with selected cross compiler"
          EXTRA_CMD="${{ inputs.extra-cmd }}"
          if [[ -n "$EXTRA_CMD" && ! "$EXTRA_CMD" =~ ^[a-zA-Z0-9_=+./,\ -]*$ ]]; then
