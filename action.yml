@@ -306,22 +306,6 @@ runs:
             done
         fi
 
-        # Get kernel version
-        VERSION=$(grep -E '^VERSION = ' Makefile | awk '{print $3}')
-        PATCHLEVEL=$(grep -E '^PATCHLEVEL = ' Makefile | awk '{print $3}')
-        SUBLEVEL=$(grep -E '^SUBLEVEL = ' Makefile | awk '{print $3}')
-
-        # Validate kernel version
-        if [ -z "$VERSION" ] || [ -z "$PATCHLEVEL" ]; then
-            error "Failed to extract kernel version from Makefile"
-        fi
-
-        # Check for non-GKI kernel for KernelSU
-        NONGKI=false
-        if [ "$VERSION" -lt 5 ] 2>/dev/null || { [ "$VERSION" -eq 5 ] 2>/dev/null && [ "$PATCHLEVEL" -lt 10 ] 2>/dev/null; }; then
-            NONGKI=true
-        fi
-
         # Use Python3 version of mkdtboimg.py
         if [ -f scripts/dtc/libfdt/mkdtboimg.py ]; then
             if grep -q python2 scripts/Makefile.lib 2>/dev/null; then
