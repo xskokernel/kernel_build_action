@@ -130,9 +130,9 @@ runs:
       shell: bash
       run: |
         #!/bin/bash
-        rm -rf kernel_workspace
         mkdir kernel_workspace
         cd kernel_workspace
+        mkdir drivers
         set -euo pipefail
 
         # Function to display error messages and exit
